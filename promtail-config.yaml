@@ -1,0 +1,66 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # CloudWatch Logs scraping configuration
+  - job_name: cloudwatch
+    cloudwatch:
+      # AWS Region - will be set from environment variable
+      region: ${AWS_REGION}
+      
+      # AWS Credentials - will be set from environment variables
+      # AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+      
+      # Log groups to scrape
+      # TODO: Replace with your actual CloudWatch Log Group names
+      log_group_names:
+        - /aws/ec2/your-instance-logs
+        # Add more log groups as needed:
+        # - /aws/lambda/your-function
+        # - /aws/rds/instance/your-db/error
+      
+      # Start reading from the most recent logs (not from beginning)
+      start_from_head: false
+      
+      # How often to poll CloudWatch for new logs
+      poll_interval: 30s
+      
+      # Labels to add to all logs from CloudWatch
+      labels:
+        job: "ec2-cloudwatch"
+        environment: "production"
+        source: "aws-cloudwatch"
+        
+    # Pipeline stages for log processing
+    pipeline_stages:
+      # Parse JSON logs if applicable
+      - json:
+          expressions:
+            level: level
+            message: message
+            timestamp: timestamp
+      
+      # Add labels from parsed fields
+      - labels:
+          level:
+      
+      # Output stage
+      - output:
+          source: message
+
+  # Optional: Local system logs (if you want to collect logs from the monitoring server itself)
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: "system-logs"
+          host: "monitoring-server"
+          __path__: /var/log/*.log
